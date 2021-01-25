@@ -16,15 +16,12 @@ from bokeh.palettes import Viridis256 as palette
 
 shapefile = './data/ne_110m_admin_0_countries.shp'
 
-#Read shapefile using Geopandas
 gdf = gpd.read_file(shapefile)[['ADMIN', 'ADM0_A3', 'geometry']]
 
-#Rename columns.
 gdf.columns = ['country_name', 'country_code', 'geometry']
 
 pathtoCSV=r'./covid.csv'
 
-#Read csv file using pandas
 df1 = pd.read_csv(pathtoCSV, encoding='utf8',names = ['country', 'confirmed_day', 'confirmed_month', 'deaths'], index_col=False)
 
 datafile_2='./country_geocodes.csv'
@@ -33,20 +30,16 @@ df2 = pd.read_csv(datafile_2, names = ['country', 'latitude', 'longitude'], skip
 points = pd.merge(df1, df2, left_on='country',right_on='country', how='left')
 points_df = points.drop(['country'],axis=1)
 
-# creating a geometry column 
 geometry_centroids = [Point(xy) for xy in zip(points_df['longitude'], points_df['latitude'])]
 
-# Coordinate reference system : WGS84
 crs = {'init': 'epsg:4326'}
 
-# Creating a Geographic data frame 
 points_gdf = gpd.GeoDataFrame(points_df, crs=crs, geometry=geometry_centroids)
 
 joined = gpd.sjoin(gdf, points_gdf, how="left", op='intersects')
 
 joined.fillna("None", inplace=True)
 
-#Read data to json.
 joined_json = json.loads(joined.to_json())
 
 palette = list(reversed(palette))
@@ -62,32 +55,20 @@ for i in range(len(joined_json['features'])):
         continue
     joined_json['features'][i]['properties']['Color'] = palette[int(math.log(current_day)/one_division)]
 
-
-#Convert to String like object.
 json_data = json.dumps(joined_json)
 
-#Input GeoJSON source that contains features for plotting.
 geosource = GeoJSONDataSource(geojson = json_data)
 
-#Create figure object.
 p = figure(title = 'Big Data Project - Covid Map, 2021',plot_height = 1000 , plot_width = 1600,
            background_fill_color="#2b8cbe", background_fill_alpha=0)
 p.title.text_font = "helvetica"
 p.xgrid.grid_line_color = None
 p.ygrid.grid_line_color = None
 
-#Add patch renderer to figure.
-
 patch=p.patches('xs', 'ys', source = geosource, fill_color='Color',
           line_color = '#d95f0e', line_width = 0.35, fill_alpha = 1, hover_fill_color="#fec44f")
 
-p.add_tools(HoverTool(tooltips=[('Country','@country_name'),('Cases per day','@confirmed_day'), 
+p.add_tools(HoverTool(tooltips=[('Country','@country_name'),('Cases per day','@confirmed_day'),
                         ('Cases per month','@confirmed_month'), ('Deaths','@deaths')], renderers=[patch]))
 
-
-#Display figure inline in Jupyter Notebook.
-# output_notebook()
-# curdoc().add_root(p)
-
-#Display figure.
 show(p)
